@@ -3,6 +3,7 @@ import firebase from 'firebase';
 import axios from 'axios';
 import {
     Text,
+    Keyboard,
     AsyncStorage,
     ScrollView,
     KeyboardAvoidingView,
@@ -12,9 +13,6 @@ import {
     TextInput,
     FlatList,
 } from 'react-native';
-import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scrollview';
-import { KeyboardAwareView } from 'react-native-keyboard-aware-view';
-import {  Spinner, Card, CardSection } from './components/common';
 import { Container, Header, Left, Body, Right, Icon, Button, Title } from 'native-base';
 import Menu from 'react-native-pop-menu';
 const styles = StyleSheet.create({
@@ -24,7 +22,7 @@ const styles = StyleSheet.create({
     messages: {
         flex: 1,
         marginTop: 20,
-},
+    },
     botMessages: {
         color: 'black',
         backgroundColor: 'white',
@@ -82,10 +80,28 @@ export default class ChatUI extends Component {
           userInput: '',
           messages: [],
           inputEnabled: true,
-         menuVisible: false,
+          menuVisible: false,
           top:0,
           right:0,
         };
+    }
+
+    componentWillMount() {
+      this.keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', this._keyboardDidShow.bind(this));
+      this.keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', this._keyboardDidHide.bind(this));
+    }
+
+    componentWillUnmount () {
+      this.keyboardDidShowListener.remove();
+      this.keyboardDidHideListener.remove();
+    }
+
+    _keyboardDidShow () {
+      this.scrollView.scrollToEnd({animate: false});
+    }
+
+    _keyboardDidHide () {
+      this.scrollView.scrollToEnd({animate: false});
     }
 
     componentDidMount() {
@@ -101,6 +117,12 @@ export default class ChatUI extends Component {
       AsyncStorage.setItem('msgs', msgArr)
         .then()
         .catch(error => console.log('State Inpersistent!'));
+    }
+
+    deleteStorage() {
+      AsyncStorage.removeItem('msgs')
+      .then()
+      .catch(error => console.log('Could not delete chats!'));
     }
 // Sends Text to the lex runtime
     handleTextSubmit() {
@@ -123,13 +145,14 @@ export default class ChatUI extends Component {
     }
 sendtoserver(message){
   var text = message;
-  axios.post('https://chat.calloused47.hasura-app.io/send', { text:text })
-    .then(response => this.showResponse(response));
-  console.log('request done');
+  axios.post('https://app.alright27.hasura-app.io/send', { text:text })
+    .then(response => this.showResponse(response))
+    .catch(error => console.log(error));
+  //console.log('request done');
 
 }
 showResponse(lexResponse) {
-        let lexMessage = lexResponse.data[0];
+        let lexMessage = lexResponse.data.output.text;
         let oldMessages = Object.assign([], this.state.messages)
         oldMessages.push({from: 'bot', msg: lexMessage})
         this.setState({
@@ -170,29 +193,25 @@ render(){
           <View style={styles.container}>
           <View>
           <Header style={{backgroundColor:'#067c87', elevation: 2}}>
-          <Left>
-
-                        <Icon name='contact' style = {{fontSize: 35, color: 'white'}}/>
-
-                    </Left>
-                    <Body>
-                      <Title>Watson</Title>
-                    </Body>
-                    <Right>
-                    <Button transparent
-                    onPress={() => {
-                           this.setState({
-                             menuVisible: true,
-                             top:50,
-                             right:-8,
-                           });
-                         }}>
-
-                      <Icon name='more' style = {{fontSize: 35, color: 'white', marginRight:5}}/>
-                    </Button>
-
-                    </Right>
-        </Header>
+            <Left>
+              <Icon name='contact' style = {{fontSize: 35, color: 'white'}}/>
+            </Left>
+            <Body>
+             <Title>Watson</Title>
+            </Body>
+            <Right>
+              <Button transparent
+                onPress={() => {
+                       this.setState({
+                         menuVisible: true,
+                         top:50,
+                         right:-8,
+                       });
+              }}>
+                <Icon name='more' style = {{fontSize: 35, color: 'white', marginRight:5}}/>
+              </Button>
+            </Right>
+          </Header>
         <Menu visible={this.state.menuVisible}
                       onVisible={(isVisible) => {
                         this.state.menuVisible = isVisible
@@ -209,6 +228,7 @@ render(){
                         {
                           title: 'Clear Chat',
                           onPress: () => {
+                            this.deleteStorage();
                             this.setState({
                                 messages: [],
                                 userInput: '',
@@ -225,14 +245,14 @@ render(){
                 onContentSizeChange={(contentWidth, contentHeight) => {
                     this.scrollView.scrollToEnd({animate: true});
               }}>
-                <KeyboardAvoidingView style={styles.messages}>
+                <View style={styles.messages}>
                     <FlatList
                         data={this.state.messages}
                         renderItem={({ item }) => this.renderTextItem(item)}
                         keyExtractor={(item, index) => index}
                         extraData={this.state.messages}
                     />
-                </KeyboardAvoidingView>
+                </View>
               </ScrollView>
 
               <View style={styles.inputContainer}>
